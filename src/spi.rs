@@ -84,12 +84,11 @@ impl Dma {
             Dma::Disabled => TRANS_LEN,
             Dma::Channel1(size) | Dma::Channel2(size) | Dma::Auto(size) => *size,
         };
-        if max_transfer_size % 4 != 0 {
-            panic!("The max transfer size must a multiple of 4")
-        } else if max_transfer_size > 4096 {
-            4096
-        } else {
-            max_transfer_size
+        match max_transfer_size {
+            x if x % 4 != 0 => panic!("The max transfer size must be a multiple of 4"),
+            x if x == 0 => panic!("The max transfer size must be greater than 0"),
+            x if x > 4096 => panic!("The max transfer size must be less than or equal to 4096"),
+            _ => max_transfer_size,
         }
     }
 }
@@ -167,6 +166,7 @@ pub mod config {
         pub write_only: bool,
         pub duplex: Duplex,
         pub cs_active_high: bool,
+        pub input_delay_ns: i32,
     }
 
     impl Config {
@@ -200,6 +200,11 @@ pub mod config {
             self.cs_active_high = true;
             self
         }
+
+        pub fn input_delay_ns(mut self, input_delay_ns: i32) -> Self {
+            self.input_delay_ns = input_delay_ns;
+            self
+        }
     }
 
     impl Default for Config {
@@ -210,6 +215,7 @@ pub mod config {
                 write_only: false,
                 cs_active_high: false,
                 duplex: Duplex::Full,
+                input_delay_ns: 0,
             }
         }
     }
@@ -556,6 +562,7 @@ where
             clock_speed_hz: config.baudrate.0 as i32,
             mode: data_mode_to_u8(config.data_mode),
             queue_size: 64,
+            input_delay_ns: config.input_delay_ns,
             flags: if config.write_only {
                 SPI_DEVICE_NO_DUMMY
             } else {
